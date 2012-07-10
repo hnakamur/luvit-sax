@@ -248,7 +248,27 @@ function Parser:_reactStartTag(c)
   end
 end
 
-function Parser:_reactEndTag(char)
+function Parser:_entryEndTag()
+  self.nameParser = NameParser:new()
+  self.nameParser:on("name", function(name)
+    self.tagName = name
+    self.attrs = {}
+  end)
+end
+
+function Parser:_reactEndTag(c)
+  if self.nameParser:react(c) then
+    return self.states.EndTag
+  end
+
+  if isSpaceChar(c) then
+    return self.states.EndTag
+  end
+
+  if c == '>' then
+    self:emit("endTag", self.tagName)
+    return self.states.Init
+  end
 end
 
 sax.NameParser = NameParser
