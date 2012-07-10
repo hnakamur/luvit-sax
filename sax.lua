@@ -142,6 +142,7 @@ function Parser:initialize()
       AttrEqual = {},
       AttrValue = {}
     },
+    EmptyTag = {},
     EndTag = {}
   }
   self.state = self.states.Init
@@ -246,13 +247,23 @@ function Parser:_reactStartTag(c)
     self:emit("startTag", self.tagName, self.attrs)
     return self.states.Init
   end
+
+  if c == '/' then
+    return self.states.EmptyTag
+  end
+end
+
+function Parser:_reactEmptyTag(c)
+  if c == '>' then
+    self:emit("emptyTag", self.tagName, self.attrs)
+    return self.states.Init
+  end
 end
 
 function Parser:_entryEndTag()
   self.nameParser = NameParser:new()
   self.nameParser:on("name", function(name)
     self.tagName = name
-    self.attrs = {}
   end)
 end
 
