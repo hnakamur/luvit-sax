@@ -18,7 +18,9 @@ function StringBuilder:isEmpty()
 end
 
 function StringBuilder:append(text)
-  table.insert(self.texts, text)
+  if text and #text > 0 then
+    table.insert(self.texts, text)
+  end
 end
 
 function StringBuilder:flush()
@@ -151,6 +153,8 @@ function Parser:initialize()
   self.divider:on("char", function(char)
     self:react(char)
   end)
+
+  self.contentBuilder = StringBuilder:new()
 end
 
 function Parser:read(data)
@@ -162,8 +166,13 @@ end
 
 function Parser:_reactInit(c)
   if c == '<' then
+    if not self.contentBuilder:isEmpty() then
+      self:emit("content", self.contentBuilder:flush())
+    end
     return self.states.SeenLT
   end
+
+  self.contentBuilder:append(c)
 end
 
 function Parser:_entrySeenLT()

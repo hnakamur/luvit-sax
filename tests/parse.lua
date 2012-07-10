@@ -89,6 +89,35 @@ exports["parseEmptyTagWithAttr"] = function (test)
   test.done()
 end
 
+exports["parseContent"] = function (test)
+  local parser = sax.Parser:new()
+  local startTagCount = 0
+  parser:on("startTag", function(name)
+    startTagCount = startTagCount + 1
+    test.equal(name, "DocumentElement")
+  end)
+  local contentCount = 0
+  parser:on("content", function(name)
+    contentCount = contentCount + 1
+    test.equal(name, "abc")
+  end)
+  local endTagCount = 0
+  parser:on("endTag", function(name)
+    endTagCount = endTagCount + 1
+    test.equal(name, "DocumentElement")
+  end)
+  parser:read("<DocumentElement>")
+  test.equal(startTagCount, 1)
+  parser:read("abc")
+  test.equal(contentCount, 0)
+  parser:read("<")
+  test.equal(contentCount, 1)
+  parser:read("/DocumentElement>")
+  test.equal(endTagCount, 1)
+  parser:finish()
+  test.done()
+end
+
 --exports["parseFull"] = function (test)
 --  local parser = sax.Parser:new()
 --  parser:read([[<?xml version="1.0" encoding="UTF-8"?>
