@@ -1,4 +1,5 @@
 local charset = require("charset")
+local string = require("string")
 local table = require("table")
 local Object = require("core").Object
 local hsm = require("hsm")
@@ -42,6 +43,16 @@ function isNameStartChar(c)
     -- TODO: follow the spec
     return false
   end
+end
+
+function isDigitChar(c)
+  return "0" <= c and c <= "9"
+end
+
+function isHexDigitChar(c)
+  return "0" <= c and c <= "9"
+    or "A" <= c and c <= "F"
+    or "a" <= c and c <= "f"
 end
 
 function isNameChar(c)
@@ -130,6 +141,107 @@ function AttrValueParser:_reactValue(c)
   -- TODO: handle entity reference like &amp; or &#14.
   table.insert(self.buffer, c)
 end
+
+local ReferenceParser = StateMachine:extend()
+
+ReferenceParser.entityMap = {
+  amp = "&",
+  lt = "<"
+}
+
+function ReferenceParser:initialize()
+  self:defineStates{
+    Init = {},
+    SeenAmp = {},
+    SeenSharp = {},
+    DecCharRef = {},
+    HexCharRef = {},
+    EntityRef = {},
+  }
+  self.state = self.states.Init
+  self.buffer = {}
+end
+
+function ReferenceParser:_reactInit(c)
+  if c == "&" then
+    return self.states.SeenAmp
+  end
+end
+
+function ReferenceParser:_reactSeenAmp(c)
+  if c == "#" then
+    return self.states.SeenSharp
+  end
+
+  if not self.nameParser then
+    self.nameParser = NameParser:new()
+    self.nameParser:on("name", function(name)
+      self.entityName = name
+    end)
+  end
+  if self.nameParser:react(c) then
+    return self.states.EntityRef
+  end
+end
+
+function ReferenceParser:_reactSeenSharp(c)
+  if c == "x" then
+    return self.states.HexCharRef
+  end
+
+  if isDigitChar(c) then
+    table.insert(self.buffer, c)
+    return self.states.DecCharRef
+  end
+end
+
+function ReferenceParser:_reactDecCharRef(c)
+  if isDigitChar(c) then
+    table.insert(self.buffer, c)
+    return self.states.DecCharRef
+  end
+
+  if c == ";" then
+    local decText = table.concat(self.buffer, "")
+    self.buffer = {}
+    local code = tonumber(decText)
+    -- TODO: convert UTF-16 to UTF-8
+    local text = string.char(code)
+    self:emit("reference", text, "&#" .. decText .. ";")
+  end
+end
+
+function ReferenceParser:_reactHexCharRef(c)
+  if isHexDigitChar(c) then
+    table.insert(self.buffer, c)
+    return self.states.HexCharRef
+  end
+
+  if c == ";" then
+    local hexText = table.concat(self.buffer, "")
+    self.buffer = {}
+    local code = tonumber(hexText, 16)
+    -- TODO: convert UTF-16 to UTF-8
+    local text = string.char(code)
+    self:emit("reference", text, "&#x" .. hexText .. ";")
+  end
+end
+
+function ReferenceParser:_reactEntityRef(c)
+  if self.nameParser:react(c) then
+    return self.states.EntityRef
+  end
+
+  if c == ";" then
+    local text = ReferenceParser.entityMap[self.entityName]
+    self:emit("reference", text, "&" .. self.entityName .. ";")
+  end
+end
+
+function ReferenceParser:finish()
+  -- TODO: emit error
+end
+
 
 local Parser = HierarchicalStateMachine:extend()
 
@@ -293,5 +405,6 @@ end
 
 sax.NameParser = NameParser
 sax.AttrValueParser = AttrValueParser
+sax.ReferenceParser = ReferenceParser
 sax.Parser = Parser
 return sax
