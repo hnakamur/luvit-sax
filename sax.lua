@@ -146,7 +146,10 @@ local ReferenceParser = StateMachine:extend()
 
 ReferenceParser.entityMap = {
   amp = "&",
-  lt = "<"
+  apos = "'",
+  gt = ">",
+  lt = "<",
+  quot = '"'
 }
 
 function ReferenceParser:initialize()
@@ -249,6 +252,7 @@ function Parser:initialize()
   self:defineStates{
     Init = {},
     SeenLT = {},
+    SeenAmp = {},
     StartTag = {
       StartTagName = {},
       SpacesAfterStartTagName = {},
@@ -277,11 +281,20 @@ function Parser:finish()
 end
 
 function Parser:_reactInit(c)
-  if c == '<' then
+  if c == "<" then
     if not self.contentBuilder:isEmpty() then
       self:emit("content", self.contentBuilder:flush())
     end
     return self.states.SeenLT
+  elseif c == "&" then
+    if not self.referenceParser then
+      self.referenceParser = ReferenceParser:new()
+      self.referenceParser:on("reference", function(text, repl)
+        self:emit("reference", text, repl)
+      end)
+    end
+    self.referenceParser:react(c)
+    return self.states.SeenAmp
   end
 
   self.contentBuilder:append(c)
@@ -304,6 +317,16 @@ function Parser:_reactSeenLT(c)
 
   if c == '/' then
     return self.states.EndTag
+  end
+end
+
+function Parser:_reactSeenAmp(c)
+  local state = self.referenceParser:react(c)
+  if c == ';' then
+    return self.states.Init
+  end
+  if state then
+    return self.states.SeenAmp
   end
 end
 

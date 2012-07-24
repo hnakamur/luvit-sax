@@ -118,6 +118,51 @@ exports["parseContent"] = function (test)
   test.done()
 end
 
+exports["parseReference1"] = function (test)
+  local parser = sax.Parser:new()
+  local eventCount = 0
+  parser:on("reference", function(text, repl)
+    eventCount = eventCount + 1
+    test.equal(text, "\013")
+    test.equal(repl, "&#13;")
+  end)
+
+  parser:read('&#13;')
+  parser:finish()
+  test.equal(eventCount, 1)
+  test.done()
+end
+
+exports["parseReference2"] = function (test)
+  local parser = sax.Parser:new()
+  local eventCount = 0
+  parser:on("reference", function(text, repl)
+    eventCount = eventCount + 1
+    test.equal(text, "\013")
+    test.equal(repl, "&#x0D;")
+  end)
+
+  parser:read('&#x0D;')
+  parser:finish()
+  test.equal(eventCount, 1)
+  test.done()
+end
+
+exports["parseReference3"] = function (test)
+  local parser = sax.Parser:new()
+  local eventCount = 0
+  parser:on("reference", function(text, repl)
+    eventCount = eventCount + 1
+    test.equal(text, "&")
+    test.equal(repl, "&amp;")
+  end)
+
+  parser:read('&amp;')
+  parser:finish()
+  test.equal(eventCount, 1)
+  test.done()
+end
+
 --exports["parseFull"] = function (test)
 --  local parser = sax.Parser:new()
 --  parser:read([[<?xml version="1.0" encoding="UTF-8"?>
